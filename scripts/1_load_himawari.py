@@ -1,15 +1,17 @@
 import os
+import time
+from pathlib import Path
 
-import xarray as xr
+import earthaccess
 import numpy as np
 import pandas as pd
-import earthaccess
+import xarray as xr
 from pyproj import Proj
 
-from pathlib import Path
-import time
 
 def calculate_latlon_xr(ds):
+    """Calculate latitude and longitude from a geostationary dataset."""
+    # ONLY NEEDED FOR L2P DATASET
 
     x = ds['ni'].values
     y = ds['nj'].values
@@ -32,6 +34,9 @@ def calculate_latlon_xr(ds):
     return X, Y, lat, lon, x, y
 
 def create_coords_dataset_xr(ds):
+    """Create an xarray dataset with coordinates for a geostationary dataset."""
+    # ONLY NEEDED FOR L2P DATASET
+    
     X, Y, lat, lon, x, y = calculate_latlon_xr(ds)
 
     # create xarray dataset
@@ -56,6 +61,9 @@ def create_coords_dataset_xr(ds):
 
 
 def get_ilims_jlims(lon, lat, lonlims, latlims):
+    """Get the i and j limits for cropping based on longitude and latitude limits."""
+    # OPTIONAL FOR L2P DATASET, NOT NEEDED FOR L3C DATASET    
+    
     def find_nearest(x_grid, y_grid, x_point, y_point):
         """Find the (j, i) indices in x_grid, y_grid closest to the point (x_point, y_point), ignoring NaNs."""
         # Create a mask for valid points
@@ -83,14 +91,8 @@ def get_ilims_jlims(lon, lat, lonlims, latlims):
 
     return ilims, jlims
 
-
-def delete_all_files(folder: Path):
-    for file in folder.glob("*"):
-        if file.is_file():
-            file.unlink()
-
-
 def retry(func, retries=20, wait_seconds=60, stop_if_error=True, *args, **kwargs):
+    """Retry a function call with a specified number of retries and wait time."""
     for attempt in range(1, retries + 1):
         try:
             return func(*args, **kwargs)
@@ -103,25 +105,19 @@ def retry(func, retries=20, wait_seconds=60, stop_if_error=True, *args, **kwargs
     else: 
         print(f"[Retry] Function '{func.__name__}' failed after {retries} retries, but continuing execution.")
 
-
-def download_data(links, output_dir):
-    files = earthaccess.download(links, output_dir)
-    if not files:
-        raise RuntimeError("No files downloaded. Check the links and credentials.")
-    return xr.open_mfdataset(files, decode_cf=False), files
-
 def main():
     timelims = ("2025-03-01T00:00:00","2025-05-01T00:00:00")
     tstep = 3600
     lonlims = (111, 116)
     latlims = (-24.5, -19.5)    
 
-    # TODO ONLY DEF IF L2P AND IGNORING LON LAT LIMS FOR CROP
-    ilims =(1314,1527) # or None
-    jlims = (3794,3995) # or None
     version = 9 # Himawari 8 or 9
     level = "L2P"
 
+    # set ilims and jlims instead of lonlims and latlims (optional and only for L2P dataset)
+    ilims = None #(1314,1527) # (imin, imax) or None
+    jlims = None #(3794,3995) # (jmin, jmax) or None
+    
     dtlims = (np.datetime64(timelims[0]), np.datetime64(timelims[1]))
     dtrange = np.arange(dtlims[0], dtlims[1], np.timedelta64(tstep, 's'))
 
@@ -141,6 +137,9 @@ def main():
     print(f"Version:     {version}")
     print(f"Level:       {level}")
 
+    # Authenticate with EarthAccess
+    # For more information on how to authenticate, see:
+    # https://earthaccess.readthedocs.io/en/stable/howto/authenticate/
     auth = earthaccess.login()
     print(f"EarthAccess authenticated: {auth.authenticated}")
 
